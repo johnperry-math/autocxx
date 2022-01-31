@@ -42,7 +42,9 @@ where
     T: 'a + MoveNew + UniquePtrTarget,
     &'a mut T: DerefMove + Deref<Target=T>
 {
-    unsafe fn new(mut self, this: Pin<&mut MaybeUninit<T>>) {
-        crate::moveit::new::mov(self.pin_mut()).new(this)
+    unsafe fn new(self, this: Pin<&mut MaybeUninit<T>>) {
+        let raw_ptr = self.into_raw();
+        crate::moveit::new::mov(Pin::new_unchecked(&mut *raw_ptr)).new(this);
+        UniquePtr::from_raw(raw_ptr); // so we drop it
     }
 }
