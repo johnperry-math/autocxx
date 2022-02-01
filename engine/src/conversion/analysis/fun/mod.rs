@@ -1694,7 +1694,6 @@ impl Api<FnPhase> {
                 ..
             } => Box::new(field_types.iter().cloned()),
             Api::Function { analysis, .. } => Box::new(analysis.deps.iter().cloned()),
-            // TODO constructors need to depend on the alloc/free fns
             Api::Subclass {
                 name: _,
                 superclass,

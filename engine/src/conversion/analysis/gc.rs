@@ -52,7 +52,7 @@ pub(crate) fn filter_apis_by_following_edges_from_allowlist(
         .collect();
     let mut by_typename: HashMap<QualifiedName, Vec<Api<FnPhase>>> = HashMap::new();
     for api in apis.drain(..) {
-        let tn = api.name().clone();
+        let tn = api.typename_for_allowlist();
         by_typename.entry(tn).or_default().push(api);
     }
     let mut done = HashSet::new();
