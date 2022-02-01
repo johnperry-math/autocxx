@@ -350,7 +350,8 @@ impl<'a> FnAnalyzer<'a> {
                         | TraitMethodKind::Dealloc,
                     ..
                 }
-            ) {
+            )
+        {
             UnsafetyNeeded::Always
         } else {
             UnsafetyNeeded::from_param_details(param_details, true)

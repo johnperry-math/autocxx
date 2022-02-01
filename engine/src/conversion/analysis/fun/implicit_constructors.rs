@@ -122,7 +122,10 @@ pub(super) fn find_missing_constructors(
             implicit_constructors_needed.insert(name.clone(), implicits);
         }
     }
-    log::info!("Implicit constructors needed: {:?}", implicit_constructors_needed);
+    log::info!(
+        "Implicit constructors needed: {:?}",
+        implicit_constructors_needed
+    );
     implicit_constructors_needed
 }
 
