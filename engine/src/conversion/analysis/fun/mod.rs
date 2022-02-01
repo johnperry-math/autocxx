@@ -594,14 +594,6 @@ impl<'a> FnAnalyzer<'a> {
             trait_details
         } else if let Some(self_ty) = self_ty {
             // Some kind of method.
-            if !self.is_on_allowlist(&self_ty) {
-                // Bindgen will output methods for types which have been encountered
-                // virally as arguments on other allowlisted types. But we don't want
-                // to generate methods unless the user has specifically asked us to.
-                // It may, for instance, be a private type.
-                return None;
-            }
-
             // Method or static method.
             let type_ident = self_ty.get_final_item();
             // bindgen generates methods with the name:
@@ -689,6 +681,9 @@ impl<'a> FnAnalyzer<'a> {
                 )
             } else {
                 let method_kind = if matches!(fun.provenance, Provenance::SynthesizedMakeUnique) {
+                    if !self.is_on_allowlist(&self_ty) {
+                        return None;
+                    }
                     // We're re-running this routine for a function we already analyzed.
                     // Previously we made a placement "new" (MethodKind::Constructor).
                     // This time we've asked ourselves to synthesize a make_unique.
@@ -713,8 +708,14 @@ impl<'a> FnAnalyzer<'a> {
                     rust_name = format!("new{}", constructor_suffix);
                     MethodKind::Constructor
                 } else if is_static_method {
+                    if !self.is_on_allowlist(&self_ty) {
+                        return None;
+                    }
                     MethodKind::Static
                 } else {
+                    if !self.is_on_allowlist(&self_ty) {
+                        return None;
+                    }
                     let receiver_mutability =
                         receiver_mutability.expect("Failed to find receiver details");
                     match fun.virtualness {
