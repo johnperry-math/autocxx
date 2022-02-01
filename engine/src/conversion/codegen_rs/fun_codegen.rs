@@ -93,7 +93,7 @@ pub(super) fn gen_function(
         return RsCodegenResult::default();
     }
     let cxxbridge_name = analysis.cxxbridge_name;
-    let rust_name = analysis.rust_name;
+    let rust_name = &analysis.rust_name;
     let ret_type = analysis.ret_type;
     let param_details = analysis.param_details;
     let wrapper_function_needed = analysis.cpp_wrapper.is_some();
@@ -105,14 +105,7 @@ pub(super) fn gen_function(
     let mut cpp_name_attr = Vec::new();
     let mut impl_entry = None;
     let mut trait_impl_entry = None;
-    let rust_name_attr: Vec<_> = match &analysis.rust_rename_strategy {
-        RustRenameStrategy::RenameUsingRustAttr => Attribute::parse_outer
-            .parse2(quote!(
-                #[rust_name = #rust_name]
-            ))
-            .unwrap(),
-        _ => Vec::new(),
-    };
+    let mut bindgen_mod_items = Vec::new();
     let fn_generator = FnGenerator {
         param_details: &param_details,
         cxxbridge_name: &cxxbridge_name,
@@ -120,27 +113,11 @@ pub(super) fn gen_function(
         unsafety: &analysis.requires_unsafe,
         doc_attr: &doc_attr,
     };
-    let mut materialization = match kind {
-        FnKind::Method(..) | FnKind::TraitMethod { .. } => None,
-        FnKind::Function => match analysis.rust_rename_strategy {
-            RustRenameStrategy::RenameInOutputMod(alias) => {
-                Some(Use::UsedFromCxxBridgeWithAlias(alias))
-            }
-            _ => Some(Use::UsedFromCxxBridge),
-        },
-    };
     // In rare occasions, we might need to give an explicit lifetime.
     let (lifetime_tokens, params, ret_type) =
         add_explicit_lifetime_if_necessary(&param_details, params, &ret_type);
-    let any_param_needs_rust_conversion = param_details
-        .iter()
-        .any(|pd| pd.conversion.rust_work_needed());
-    let rust_wrapper_needed = match kind {
-        FnKind::TraitMethod { .. } => true,
-        FnKind::Method(..) => any_param_needs_rust_conversion || cxxbridge_name != rust_name,
-        _ => any_param_needs_rust_conversion,
-    };
-    if rust_wrapper_needed {
+
+    if analysis.rust_wrapper_needed {
         match kind {
             FnKind::Method(ref type_name, MethodKind::Constructor) => {
                 // Constructor.
@@ -162,10 +139,23 @@ pub(super) fn gen_function(
             }
             _ => {
                 // Generate plain old function
-                materialization = Some(Use::Custom(fn_generator.generate_function_impl(&ret_type)));
+                bindgen_mod_items.push(fn_generator.generate_function_impl(&ret_type));
             }
         }
     }
+
+    let materialization = match kind {
+        FnKind::Method(..) | FnKind::TraitMethod { .. } => None,
+        FnKind::Function => match analysis.rust_rename_strategy {
+            _ if analysis.rust_wrapper_needed => {
+                Some(Use::SpecificNameFromBindgen(make_ident(rust_name)))
+            }
+            RustRenameStrategy::RenameInOutputMod(ref alias) => {
+                Some(Use::UsedFromCxxBridgeWithAlias(alias.clone()))
+            }
+            _ => Some(Use::UsedFromCxxBridge),
+        },
+    };
     if cxxbridge_name != cpp_call_name && !wrapper_function_needed {
         cpp_name_attr = Attribute::parse_outer
             .parse2(quote!(
@@ -173,6 +163,14 @@ pub(super) fn gen_function(
             ))
             .unwrap();
     }
+    let rust_name_attr: Vec<_> = match &analysis.rust_rename_strategy {
+        RustRenameStrategy::RenameUsingRustAttr => Attribute::parse_outer
+            .parse2(quote!(
+                #[rust_name = #rust_name]
+            ))
+            .unwrap(),
+        _ => Vec::new(),
+    };
 
     // Finally - namespace support. All the Types in everything
     // above this point are fully qualified. We need to unqualify them.
@@ -207,6 +205,7 @@ pub(super) fn gen_function(
     ));
     RsCodegenResult {
         extern_c_mod_items: vec![extern_c_mod_item],
+        bindgen_mod_items,
         impl_entry,
         trait_impl_entry,
         materializations: materialization.into_iter().collect(),
@@ -369,24 +368,25 @@ impl<'a> FnGenerator<'a> {
     }
 
     /// Generate a function call wrapper
-    fn generate_function_impl(&self, ret_type: &ReturnType) -> Box<Item> {
+    fn generate_function_impl(&self, ret_type: &ReturnType) -> Item {
         let (wrapper_params, local_variables, arg_list) = self.generate_arg_lists(false);
         let rust_name = make_ident(self.rust_name);
         let doc_attr = self.doc_attr;
         let unsafety = self.unsafety.wrapper_token();
+        let cxxbridge_name = self.cxxbridge_name;
         let body = self.wrap_call_with_unsafe(
             quote! {
-                cxxbridge::#rust_name ( #(#arg_list),* )
+                cxxbridge::#cxxbridge_name ( #(#arg_list),* )
             },
             false,
         );
-        Box::new(Item::Fn(parse_quote! {
+        Item::Fn(parse_quote! {
             #doc_attr
             pub #unsafety fn #rust_name ( #wrapper_params ) #ret_type {
                 #(#local_variables),*
                 #body
             }
-        }))
+        })
     }
 
     fn reorder_parameters(

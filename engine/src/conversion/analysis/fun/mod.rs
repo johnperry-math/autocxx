@@ -140,6 +140,9 @@ pub(crate) enum RustRenameStrategy {
     /// Even the #[rust_name] attribute would cause conflicts, and we need
     /// to use a 'use XYZ as ABC'
     RenameInOutputMod(Ident),
+    /// This function requires us to generate a Rust function to do
+    /// parameter conversion.
+    RenameUsingWrapperFunction,
 }
 
 #[derive(Clone)]
@@ -164,6 +167,8 @@ pub(crate) struct FnAnalysis {
     /// Whether this can be called by external code. Not so for
     /// protected methods.
     pub(crate) externally_callable: bool,
+    /// Whether we need to generate a Rust-side calling function
+    pub(crate) rust_wrapper_needed: bool,
 }
 
 #[derive(Clone)]
@@ -1060,11 +1065,25 @@ impl<'a> FnAnalyzer<'a> {
 
         let vis = fun.vis.clone();
 
+        let any_param_needs_rust_conversion = param_details
+            .iter()
+            .any(|pd| pd.conversion.rust_work_needed());
+
+        let rust_wrapper_needed = match kind {
+            FnKind::TraitMethod { .. } => true,
+            FnKind::Method(..) => any_param_needs_rust_conversion || cxxbridge_name != rust_name,
+            _ => any_param_needs_rust_conversion,
+        };
+
         // Naming, part two.
         // Work out our final naming strategy.
         validate_ident_ok_for_cxx(&cxxbridge_name.to_string()).unwrap_or_else(set_ignore_reason);
         let rust_name_ident = make_ident(&rust_name);
         let (id, rust_rename_strategy) = match kind {
+            _ if rust_wrapper_needed => (
+                rust_name_ident,
+                RustRenameStrategy::RenameUsingWrapperFunction,
+            ),
             FnKind::Method(..) | FnKind::TraitMethod { .. } => {
                 (rust_name_ident, RustRenameStrategy::None)
             }
@@ -1102,6 +1121,7 @@ impl<'a> FnAnalyzer<'a> {
             deps,
             ignore_reason,
             externally_callable,
+            rust_wrapper_needed,
         };
         let name = ApiName::new_with_cpp_name(ns, id, cpp_name);
         Some((analysis, name))
