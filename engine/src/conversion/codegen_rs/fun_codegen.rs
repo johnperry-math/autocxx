@@ -264,9 +264,12 @@ impl<'a> FnGenerator<'a> {
         let unsafety = self.unsafety.wrapper_token();
         let doc_attr = self.doc_attr;
         let cxxbridge_name = self.cxxbridge_name;
-        let call_body = quote! {
-            cxxbridge::#cxxbridge_name ( #(#arg_list),* )
-        };
+        let call_body = self.wrap_call_with_unsafe(
+            quote! {
+                cxxbridge::#cxxbridge_name ( #(#arg_list),* )
+            },
+            false,
+        );
         Box::new(ImplBlockDetails {
             item: ImplItem::Method(parse_quote! {
                 #doc_attr
