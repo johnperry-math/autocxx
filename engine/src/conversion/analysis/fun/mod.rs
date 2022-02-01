@@ -340,7 +340,7 @@ impl<'a> FnAnalyzer<'a> {
         param_details: &[ArgumentAnalysis],
         kind: &FnKind,
     ) -> UnsafetyNeeded {
-        let r = if self.unsafe_policy == UnsafePolicy::AllFunctionsUnsafe
+        if self.unsafe_policy == UnsafePolicy::AllFunctionsUnsafe
             || matches!(
                 kind,
                 FnKind::TraitMethod {
@@ -354,9 +354,7 @@ impl<'a> FnAnalyzer<'a> {
             UnsafetyNeeded::Always
         } else {
             UnsafetyNeeded::from_param_details(param_details, true)
-        };
-        log::info!("Calculated {:?}", r);
-        r
+        }
     }
 
     /// Analyze a given function, and any permutations of that function which
@@ -831,7 +829,6 @@ impl<'a> FnAnalyzer<'a> {
             _ => {}
         }
 
-        log::info!("About to find out unsafety for {:?}", &rust_name);
         let requires_unsafe = self.should_be_unsafe(&param_details, &kind);
 
         // Now we can add context to the error, check for a variety of error
