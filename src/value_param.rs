@@ -1,4 +1,4 @@
-use cxx::{UniquePtr, memory::UniquePtrTarget};
+use cxx::{memory::UniquePtrTarget, UniquePtr};
 // Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +12,9 @@ use cxx::{UniquePtr, memory::UniquePtrTarget};
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use moveit::{CopyNew, New, MoveNew, DerefMove};
+use moveit::{CopyNew, MakeCppStorage, MoveNew, New};
 
-use std::{mem::MaybeUninit, pin::Pin, ops::Deref};
+use std::{mem::MaybeUninit, pin::Pin};
 
 /// A trait which is used to receive any C++ parameter passed by value.
 /// This trait is implemented both for references `&T` and for `UniquePtr<T>`,
@@ -37,14 +37,11 @@ where
     }
 }
 
-impl<'a, T> ValueParam<T> for UniquePtr<T>
+impl<T> ValueParam<T> for UniquePtr<T>
 where
-    T: 'a + MoveNew + UniquePtrTarget,
-    &'a mut T: DerefMove + Deref<Target=T>
+    T: MoveNew + UniquePtrTarget + MakeCppStorage,
 {
     unsafe fn new(self, this: Pin<&mut MaybeUninit<T>>) {
-        let raw_ptr = self.into_raw();
-        crate::moveit::new::mov(Pin::new_unchecked(&mut *raw_ptr)).new(this);
-        UniquePtr::from_raw(raw_ptr); // so we drop it
+        crate::moveit::mov_up(self).new(this)
     }
 }
