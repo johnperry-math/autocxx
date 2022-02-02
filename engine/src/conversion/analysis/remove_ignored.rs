@@ -14,6 +14,7 @@
 
 use std::collections::HashSet;
 
+use super::deps::HasDependencies;
 use super::fun::{FnAnalysis, FnKind, FnPhase};
 use crate::conversion::{convert_error::ErrorContext, ConvertError};
 use crate::{conversion::api::Api, known_types};

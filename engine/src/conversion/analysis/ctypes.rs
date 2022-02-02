@@ -20,6 +20,7 @@ use crate::conversion::api::ApiName;
 use crate::types::Namespace;
 use crate::{conversion::api::Api, known_types::known_types, types::QualifiedName};
 
+use super::deps::HasDependencies;
 use super::fun::FnPhase;
 
 /// Spot any variable-length C types (e.g. unsigned long)

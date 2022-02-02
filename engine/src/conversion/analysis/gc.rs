@@ -18,7 +18,7 @@ use autocxx_parser::IncludeCppConfig;
 
 use crate::{conversion::api::Api, types::QualifiedName};
 
-use super::fun::FnPhase;
+use super::{deps::HasDependencies, fun::FnPhase};
 
 /// This is essentially mark-and-sweep garbage collection of the
 /// [Api]s that we've discovered. Why do we do this, you might wonder?

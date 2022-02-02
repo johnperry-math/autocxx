@@ -199,11 +199,28 @@ impl Default for ReturnTypeAnalysis {
     }
 }
 
+/// An analysis phase where we've analyzed each function, but
+/// haven't yet determined which constructors/etc. belong to each type.
+pub(crate) struct FnPhase1;
+
+impl AnalysisPhase for FnPhase1 {
+    type TypedefAnalysis = TypedefAnalysis;
+    type StructAnalysis = PodAnalysis;
+    type FunAnalysis = FnAnalysis;
+}
+
+pub(crate) struct PodAndDepAnalysis {
+    pub(crate) pod: PodAnalysis,
+    pub(crate) constructor_and_allocator_deps: Vec<QualifiedName>,
+}
+
+/// Analysis phase after we've finished analyzing functions and determined
+/// which constructors etc. belong to them.
 pub(crate) struct FnPhase;
 
 impl AnalysisPhase for FnPhase {
     type TypedefAnalysis = TypedefAnalysis;
-    type StructAnalysis = PodAnalysis;
+    type StructAnalysis = PodAndDepAnalysis;
     type FunAnalysis = FnAnalysis;
 }
 
@@ -225,7 +242,7 @@ impl<'a> FnAnalyzer<'a> {
         apis: Vec<Api<PodPhase>>,
         unsafe_policy: UnsafePolicy,
         config: &'a IncludeCppConfig,
-    ) -> Vec<Api<FnPhase>> {
+    ) -> Vec<Api<FnPhase1>> {
         let mut me = Self {
             unsafe_policy,
             rust_name_tracker: RustNameTracker::new(),
@@ -364,7 +381,7 @@ impl<'a> FnAnalyzer<'a> {
         &mut self,
         name: ApiName,
         fun: Box<FuncToConvert>,
-    ) -> Result<Box<dyn Iterator<Item = Api<FnPhase>>>, ConvertErrorWithContext> {
+    ) -> Result<Box<dyn Iterator<Item = Api<FnPhase1>>>, ConvertErrorWithContext> {
         let initial_name = name.clone();
         let maybe_analysis_and_name = self.analyze_foreign_fn(name, &fun);
 
@@ -454,7 +471,7 @@ impl<'a> FnAnalyzer<'a> {
         &mut self,
         name: ApiName,
         new_func: Box<FuncToConvert>,
-        results: &mut Vec<Api<FnPhase>>,
+        results: &mut Vec<Api<FnPhase1>>,
     ) {
         let maybe_another_api = self.analyze_foreign_fn(name, &new_func);
         if let Some((analysis, name)) = maybe_another_api {
@@ -473,7 +490,7 @@ impl<'a> FnAnalyzer<'a> {
         &mut self,
         fun: &FuncToConvert,
         initial_name: ApiName,
-        results: &mut Vec<Api<FnPhase>>,
+        results: &mut Vec<Api<FnPhase1>>,
     ) {
         let mut new_fun = fun.clone();
         new_fun.provenance = Provenance::SynthesizedMakeUnique;
@@ -1514,7 +1531,7 @@ impl<'a> FnAnalyzer<'a> {
     /// would need to output a `FnAnalysisBody`. By running it as part of this phase
     /// we can simply generate the sort of thing bindgen generates, then ask
     /// the existing code in this phase to figure out what to do with it.
-    fn add_missing_constructors(&mut self, apis: &mut Vec<Api<FnPhase>>) {
+    fn add_missing_constructors(&mut self, apis: &mut Vec<Api<FnPhase1>>) {
         if self.config.exclude_impls {
             return;
         }
@@ -1574,7 +1591,7 @@ impl<'a> FnAnalyzer<'a> {
         &mut self,
         self_ty: QualifiedName,
         label: Option<&str>,
-        apis: &mut Vec<Api<FnPhase>>,
+        apis: &mut Vec<Api<FnPhase1>>,
         special_member: SpecialMemberKind,
         inputs: Punctuated<FnArg, Comma>,
         references: References,
@@ -1676,36 +1693,5 @@ impl Api<FnPhase> {
             | Api::RustSubclassFn { .. } => None,
             _ => Some(self.name().get_final_ident()),
         }
-    }
-
-    /// Any dependencies on other APIs which this API has.
-    pub(crate) fn deps(&self) -> Box<dyn Iterator<Item = &QualifiedName> + '_> {
-        match self {
-            Api::Typedef {
-                old_tyname,
-                analysis: TypedefAnalysis { deps, .. },
-                ..
-            } => Box::new(old_tyname.iter().chain(deps.iter())),
-            Api::Struct {
-                analysis:
-                    PodAnalysis {
-                        kind: TypeKind::Pod,
-                        field_types,
-                        ..
-                    },
-                ..
-            } => Box::new(field_types.iter()),
-            Api::Function { analysis, .. } => Box::new(analysis.deps.iter()),
-            Api::Subclass {
-                name: _,
-                superclass,
-            } => Box::new(std::iter::once(superclass)),
-            Api::RustSubclassFn { details, .. } => Box::new(details.dependency.iter()),
-            _ => Box::new(std::iter::empty()),
-        }
-    }
-
-    pub(crate) fn format_deps(&self) -> String {
-        self.deps().join(",")
     }
 }

@@ -50,7 +50,7 @@ use self::{
 };
 
 use super::{
-    analysis::fun::{FnAnalysis, FnKind},
+    analysis::fun::{FnAnalysis, FnKind, PodAndDepAnalysis},
     api::{Layout, Provenance, RustSubclassFnDetails, TraitImplSignature, UnsafetyNeeded},
     codegen_cpp::type_to_cpp::{
         namespaced_name_using_original_name_map, original_name_map_from_apis, CppNameMap,
@@ -533,15 +533,17 @@ impl<'a> RsCodeGenerator<'a> {
                 ..Default::default()
             },
             Api::Struct {
-                details, analysis, ..
+                details,
+                analysis: PodAndDepAnalysis { pod, .. },
+                ..
             } => {
                 let doc_attr = get_doc_attr(&details.item.attrs);
                 let layout = details.layout.clone();
                 self.generate_type(
                     &name,
                     id,
-                    analysis.kind,
-                    analysis.movable,
+                    pod.kind,
+                    pod.movable,
                     || Some((Item::Struct(details.item), doc_attr)),
                     associated_methods,
                     layout,

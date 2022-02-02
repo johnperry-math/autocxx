@@ -32,7 +32,7 @@ use crate::{
     types::{make_ident, Namespace, QualifiedName},
 };
 
-use super::{FnAnalysis, FnPhase};
+use super::{FnAnalysis, FnPhase1};
 
 pub(super) fn subclasses_by_superclass(
     apis: &[Api<PodPhase>],
@@ -84,7 +84,7 @@ pub(super) fn create_subclass_function(
     receiver_mutability: &ReceiverMutability,
     superclass: &QualifiedName,
     dependency: Option<&QualifiedName>,
-) -> Api<FnPhase> {
+) -> Api<FnPhase1> {
     let cpp = sub.cpp();
     let holder_name = sub.holder();
     let rust_call_name = make_ident(format!(
@@ -102,7 +102,7 @@ pub(super) fn create_subclass_function(
     } else {
         CppFunctionKind::ConstMethod
     };
-    let subclass_function: Api<FnPhase> = Api::RustSubclassFn {
+    Api::RustSubclassFn {
         name: ApiName::new_in_root_namespace(rust_call_name.clone()),
         subclass: sub.clone(),
         details: Box::new(RustSubclassFnDetails {
@@ -133,8 +133,7 @@ pub(super) fn create_subclass_function(
                 FnKind::Method(_, MethodKind::PureVirtual(..))
             ),
         }),
-    };
-    subclass_function
+    }
 }
 
 pub(super) fn create_subclass_constructor(
