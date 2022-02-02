@@ -22,11 +22,12 @@ use crate::types::QualifiedName;
 use super::deps::HasDependencies;
 
 /// Return APIs in a depth-first order, i.e. those with no dependencies first.
-pub(super) fn depth_first<T: HasDependencies + Debug>(items: &[T]) -> impl Iterator<Item = &T> {
-    DepthFirstIter {
-        queue: items.iter().collect(),
-        yet_to_do: items.iter().map(|api| api.name()).collect(),
-    }
+pub(super) fn depth_first<'a, T: HasDependencies + Debug + 'a>(
+    inputs: impl Iterator<Item = &'a T> + 'a,
+) -> impl Iterator<Item = &'a T> {
+    let queue: VecDeque<_> = inputs.collect();
+    let yet_to_do = queue.iter().map(|api| api.name()).collect();
+    DepthFirstIter { queue, yet_to_do }
 }
 
 struct DepthFirstIter<'a, T: HasDependencies + Debug> {
@@ -93,7 +94,7 @@ mod test {
             vec![QualifiedName::new_from_cpp_name("a")],
         );
         let api_list = vec![a, b, c];
-        let mut it = depth_first(&api_list);
+        let mut it = depth_first(api_list.iter());
         assert_eq!(it.next().unwrap().0, QualifiedName::new_from_cpp_name("a"));
         assert_eq!(it.next().unwrap().0, QualifiedName::new_from_cpp_name("c"));
         assert_eq!(it.next().unwrap().0, QualifiedName::new_from_cpp_name("b"));

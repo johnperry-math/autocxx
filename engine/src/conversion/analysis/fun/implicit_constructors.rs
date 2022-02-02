@@ -61,7 +61,10 @@ pub(super) fn find_missing_constructors(
 ) -> HashMap<QualifiedName, ImplicitConstructorsNeeded> {
     let explicits = find_explicit_items(apis);
     let mut implicit_constructors_needed = HashMap::new();
-    for api in depth_first(apis) {
+    // Important only to ask for a depth-first analysis of structs, because
+    // when all APIs are considered there may be reference loops and that would
+    // panic.
+    for api in depth_first(apis.iter().filter(|api| matches!(api, Api::Struct { .. }))) {
         if let Api::Struct {
             name,
             analysis: PodAnalysis {
