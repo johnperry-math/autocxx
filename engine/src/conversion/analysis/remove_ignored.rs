@@ -56,7 +56,7 @@ pub(crate) fn filter_apis_by_ignored_dependents(mut apis: Vec<Api<FnPhase>>) -> 
                     });
                     let first = missing_deps.next();
                     std::mem::drop(missing_deps);
-                    if let Some(missing_dep) = first {
+                    if let Some(missing_dep) = first.cloned() {
                         create_ignore_item(api, ConvertError::UnknownDependentType(missing_dep))
                     } else {
                         api

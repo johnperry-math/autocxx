@@ -1679,13 +1679,13 @@ impl Api<FnPhase> {
     }
 
     /// Any dependencies on other APIs which this API has.
-    pub(crate) fn deps(&self) -> Box<dyn Iterator<Item = QualifiedName> + '_> {
+    pub(crate) fn deps(&self) -> Box<dyn Iterator<Item = &QualifiedName> + '_> {
         match self {
             Api::Typedef {
                 old_tyname,
                 analysis: TypedefAnalysis { deps, .. },
                 ..
-            } => Box::new(old_tyname.iter().chain(deps.iter()).cloned()),
+            } => Box::new(old_tyname.iter().chain(deps.iter())),
             Api::Struct {
                 analysis:
                     PodAnalysis {
@@ -1694,13 +1694,13 @@ impl Api<FnPhase> {
                         ..
                     },
                 ..
-            } => Box::new(field_types.iter().cloned()),
-            Api::Function { analysis, .. } => Box::new(analysis.deps.iter().cloned()),
+            } => Box::new(field_types.iter()),
+            Api::Function { analysis, .. } => Box::new(analysis.deps.iter()),
             Api::Subclass {
                 name: _,
                 superclass,
-            } => Box::new(std::iter::once(superclass.clone())),
-            Api::RustSubclassFn { details, .. } => Box::new(details.dependency.iter().cloned()),
+            } => Box::new(std::iter::once(superclass)),
+            Api::RustSubclassFn { details, .. } => Box::new(details.dependency.iter()),
             _ => Box::new(std::iter::empty()),
         }
     }

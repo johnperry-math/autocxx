@@ -35,7 +35,7 @@ fn depth_first_impl<T: HasDependencies + Debug>(items: &[T]) -> impl Iterator<It
 
 trait HasDependencies {
     fn name(&self) -> &QualifiedName;
-    fn deps(&self) -> Box<dyn Iterator<Item = QualifiedName> + '_>;
+    fn deps(&self) -> Box<dyn Iterator<Item = &QualifiedName> + '_>;
 }
 
 struct DepthFirstIter<'a, T: HasDependencies + Debug> {
@@ -73,7 +73,7 @@ impl HasDependencies for Api<FnPhase> {
         self.name()
     }
 
-    fn deps(&self) -> Box<dyn Iterator<Item = QualifiedName> + '_> {
+    fn deps(&self) -> Box<dyn Iterator<Item = &QualifiedName> + '_> {
         self.deps()
     }
 }
@@ -92,8 +92,8 @@ mod test {
             &self.0
         }
 
-        fn deps(&self) -> Box<dyn Iterator<Item = QualifiedName> + '_> {
-            Box::new(self.1.iter().cloned())
+        fn deps(&self) -> Box<dyn Iterator<Item = &QualifiedName> + '_> {
+            Box::new(self.1.iter())
         }
     }
 
